@@ -54,6 +54,7 @@ namespace partsSoftClient.Forms
 			timer.Enabled = true;
 
 		}
+
 		private void OnTimedEvent(Object source, ElapsedEventArgs e)
 		{
 			// Timer arka planda çalıştığı için UI iş parçacığında güncelleme yapmalıyız.
@@ -62,49 +63,52 @@ namespace partsSoftClient.Forms
 
 		private async void LoadInvoices()
 		{
-			dataGridView1.Columns.Clear();
-			dataGridView1.Rows.Clear();
-
-			List<Invoice> DownloadInvoices = new List<Invoice>();
-			List<Invoice> invoices = InvoiceController.get(url, endPointWithUserId);
-			
-			foreach (var invoice in invoices)
+			try
 			{
-				if (!invoice.download)
+				// DataGridView'ı temizle
+				dataGridView1.Columns.Clear();
+				dataGridView1.Rows.Clear();
+
+				// Faturaları indir ve filtrele
+				List<Invoice> invoices = InvoiceController.get(url, endPointWithUserId);
+				List<Invoice> downloadInvoices = invoices.Where(invoice => !invoice.download).ToList();
+
+				// DataGridView'e özelleştirilmiş buton ve sütunları ekle
+				DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
+				dataGridViewComponent.CustomInvoiceCollumn(downloadInvoices, dataGridView1, false);
+
+				// Aktif yazıcıyı bul
+				List<Printer> printers = PrinterController.get();
+				string printerName = printers.FirstOrDefault(printer => printer.Status)?.Name;
+
+				if (string.IsNullOrEmpty(printerName))
 				{
-					DownloadInvoices.Add(invoice);
+					MessageBox.Show("Aktif yazıcı bulunamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+					return;
 				}
-				
+
+				// Her bir indirilecek fatura için yazdırma işlemini gerçekleştir ve durumu güncelle
+				foreach (var invoice in downloadInvoices)
+				{
+					string id = invoice.invoiceId.ToString();
+					string filePath= pdf_Dowload(invoice.invoicePath);
+					bool isSuccess = PrinterHelper.PrintInvoice(filePath, printerName);
+
+					if (isSuccess)
+					{
+						await InvoiceController.Post(id, true);
+					}
+					else
+					{
+						MessageBox.Show($"Fatura {id} yazdırılamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+					}
+				}
+
+				//MessageBox.Show("Tüm faturalar yazdırıldı.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
-
-
-			DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
-			DataGridViewButtonColumn sendButton = dataGridViewComponent.CustomButton("Print", "Yazdır");
-			dataGridViewComponent.CustomInvoiceCollumn(invoices, sendButton, dataGridView1);
-			//MessageBox.Show("İstek Yapıldı");
-
-			foreach (var invoice in DownloadInvoices)
+			catch (Exception ex)
 			{
-				string id = invoice.invoiceId.ToString();
-				PrintInvoice(invoice.invoicePath, "Microsoft Print to PDF");
-				await InvoiceController.Post(id, true);
-
-			}
-			//MessageBox.Show("Tümü Yazıcıya Gönderildi.");
-
-
-
-		}
-
-		private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
-		{
-			if (e.ColumnIndex == 5)
-			{
-				string invoicePath = dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString();
-
-				//PrinterHelper.PrintPdf(invoicePath);
-				PrintInvoice(invoicePath, "Microsoft Print to PDF");
-
+				MessageBox.Show($"Bir hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			}
 		}
 
@@ -115,10 +119,13 @@ namespace partsSoftClient.Forms
 
 		private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
 		{
-			if (e.ColumnIndex == 3)
+			if (e.ColumnIndex == 4)
 			{
-				string sUrl = dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString();
-				ProcessStartInfo sInfo = new ProcessStartInfo(sUrl);
+				string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+				string uploadPath = Path.Combine(desktopPath, "uploads");
+				string fileName = dataGridView1.Rows[e.RowIndex].Cells[4].Value.ToString();
+				string filePath = Path.Combine(uploadPath, fileName);
+				ProcessStartInfo sInfo = new ProcessStartInfo(filePath);
 				Process.Start(sInfo);
 			}
 		}
@@ -132,33 +139,33 @@ namespace partsSoftClient.Forms
 			}
 		}
 
-		private void PrintInvoice(string filePath, string printerName)
+		private string pdf_Dowload(string fileName)
 		{
-			if (!File.Exists(filePath))
+			string url = "http://localhost:3000"; // İndirilecek dosyanın URL'si
+			string endPoint = "/uploads"+"/"+ fileName; // İndirilecek dosyanın URL'si
+														
+			string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+			string uploadPath = Path.Combine(desktopPath, "uploads");
+			if (!Directory.Exists(uploadPath))
 			{
-				MessageBox.Show($"File {filePath} does not exist.");
-				return;
+				Directory.CreateDirectory(uploadPath);
 			}
+			string filePath = Path.Combine(uploadPath, fileName);
 
 			try
 			{
-				using (var document = PdfDocument.Load(filePath))
-				{
-					using (var printDocument = document.CreatePrintDocument())
-					{
-						printDocument.PrinterSettings.PrinterName = printerName;
-						printDocument.PrintController = new StandardPrintController(); // Yazdırma işlemi sırasında gösterilen dialogları devre dışı bırakır
-						printDocument.Print();
-						//MessageBox.Show($"Printing {filePath} complete.");
-					}
-				}
+				InvoiceController.DownloadFile(url, endPoint, filePath);
+				MessageBox.Show("Dosya başarıyla indirildi ve kaydedildi!", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show($"Error printing {filePath}: {ex.Message}");
+				MessageBox.Show($"Dosya indirilemedi: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			}
+			return filePath;
 		}
+
 		
+
 	}
 }
 

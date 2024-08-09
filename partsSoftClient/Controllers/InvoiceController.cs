@@ -3,6 +3,7 @@ using partsSoftClient.Entity;
 using partsSoftClient.Models;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -53,6 +54,19 @@ namespace partsSoftClient.Controllers
 
 				//MessageBox.Show($"Message: {responseModel.message}\nSuccess: {responseModel.isSuccess}", "Response", MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
+		}
+
+		public static void  DownloadFile(string url, string endPoint, string filePath)
+		{
+			using (var client = new HttpClient(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate }))
+			{
+				client.BaseAddress = new Uri(url);
+				HttpResponseMessage response = client.GetAsync(endPoint).Result;
+				response.EnsureSuccessStatusCode();
+				byte[] fileBytes = response.Content.ReadAsByteArrayAsync().Result;
+				File.WriteAllBytes(filePath, fileBytes);
+			}
+
 		}
 	}
 }

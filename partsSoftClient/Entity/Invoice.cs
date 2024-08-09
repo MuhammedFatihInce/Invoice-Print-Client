@@ -13,5 +13,6 @@ namespace partsSoftClient.Entity
 		public string userName { get; set; }
 		public string invoicePath { get; set; }
 		public bool download { get; set; }
+		public DateTime updatedAt { get; set; }
 	}
 }

@@ -15,7 +15,7 @@ namespace partsSoftClient.Controllers
 {
 	public class PrinterController
 	{
-		public static async Task<ResponseModel> Post(string name, string portNumber, string hostAddress, bool status)
+		public static ResponseModel Post(string name, string portNumber, string hostAddress, bool status)
 		{
 			var printer = new Printer
 			{
@@ -24,15 +24,15 @@ namespace partsSoftClient.Controllers
 				HostAddress = hostAddress,
 				Status = status
 			};
-		
+
 			var json = JsonConvert.SerializeObject(printer);
 			var data = new StringContent(json, Encoding.UTF8, "application/json");
 			var url = "http://127.0.0.1:3000/api/printer/post";
 
 			using (var client = new HttpClient())
 			{
-				var response = await client.PostAsync(url, data);
-				var result = await response.Content.ReadAsStringAsync();
+				var response = client.PostAsync(url, data).Result;
+				var result = response.Content.ReadAsStringAsync().Result;
 
 				var responseModel = JsonConvert.DeserializeObject<ResponseModel>(result);
 
@@ -41,6 +41,7 @@ namespace partsSoftClient.Controllers
 				//MessageBox.Show($"Message: {responseModel.message}\nSuccess: {responseModel.isSuccess}", "Response", MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
 		}
+
 
 		public static List<Printer> get()
 		{

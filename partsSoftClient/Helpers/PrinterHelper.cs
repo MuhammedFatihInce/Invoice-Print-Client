@@ -3,6 +3,7 @@ using partsSoftClient.Entity;
 using PdfiumViewer;
 using System;
 using System.Collections.Generic;
+using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Management;
@@ -85,6 +86,39 @@ namespace partsSoftClient.Helpers
 					}
 				}
 			}
+		}
+
+		public static bool PrintInvoice(string filePath, string printerName)
+		{
+			bool isSuccess= false;
+			if (!File.Exists(filePath))
+			{
+				MessageBox.Show($"File {filePath} does not exist.");
+				isSuccess = false;
+				return isSuccess;
+			}
+
+			try
+			{
+				using (var document = PdfDocument.Load(filePath))
+				{
+					using (var printDocument = document.CreatePrintDocument())
+					{
+						printDocument.PrinterSettings.PrinterName = printerName;
+						printDocument.PrintController = new StandardPrintController(); // Yazdırma işlemi sırasında gösterilen dialogları devre dışı bırakır
+						printDocument.Print();
+						//MessageBox.Show($"Printing {filePath} complete.");
+						isSuccess = true;
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show($"Error printing {filePath}: {ex.Message}");
+				isSuccess = false;
+			}
+
+			return isSuccess;
 		}
 	}
 }

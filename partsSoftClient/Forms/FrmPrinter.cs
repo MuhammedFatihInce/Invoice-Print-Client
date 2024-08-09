@@ -39,14 +39,15 @@ namespace partsSoftClient.Forms
 
 			if (e.ColumnIndex == 4)
 			{
-				string Name = dataGridView1.Rows[e.RowIndex].Cells[0].Value.ToString();
-				string Host = dataGridView1.Rows[e.RowIndex].Cells[2].Value.ToString();
+				string Name = dataGridView1.Rows[e.RowIndex].Cells[1].Value.ToString();
+				string Host = dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString();
 
 				List<Printer> printers = PrinterController.get();
 				foreach (var printer in printers)
 				{
 					await PrinterController.Update(printer.Name, printer.HostAddress, false);
 				}
+				
 				await PrinterController.Update(Name, Host, true);
 				printerLoad();
 			}
@@ -57,12 +58,12 @@ namespace partsSoftClient.Forms
 			e.Cancel = true;
 		}
 
-		public async void printerPost()
+		public void printerPost()
 		{
 			List<Printer> printers = PrinterHelper.Scanner();
 			foreach (var printer in printers)
 			{
-				ResponseModel response = await PrinterController.Post(printer.Name, printer.PortNumber, printer.PortNumber, false);
+				ResponseModel response = PrinterController.Post(printer.Name, printer.PortNumber, printer.HostAddress, false);
 				//MessageBoxComponent.Message("İnfo", response.message, response.isSuccess);
 			}
 		}
