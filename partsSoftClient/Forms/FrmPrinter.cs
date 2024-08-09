@@ -1,31 +1,33 @@
-﻿using DevExpress.XtraEditors;
-using DevExpress.XtraEditors.Controls;
-using DevExpress.XtraEditors.Repository;
-using DevExpress.XtraGrid.Columns;
-using DevExpress.XtraGrid.Views.Base;
-using partsSoftClient.Components;
+﻿using partsSoftClient.Components;
 using partsSoftClient.Controllers;
 using partsSoftClient.Entity;
 using partsSoftClient.Helpers;
 using partsSoftClient.Models;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace partsSoftClient.Forms
 {
 	public partial class FrmPrinter : Form
 	{
+		List<Printer> getPrinters;
+
+		string postUrl = "http://127.0.0.1:3000/api/printer/post";
+
+		string getUrl = "http://127.0.0.1:3000";
+		string getEndPoint = "/api/printer/get";
+
+		string updateUrl = "http://127.0.0.1:3000/api/printer/updateStatus";
+
+		PrinterController printerController = new PrinterController();
+
+
+
 		public FrmPrinter()
 		{
 			InitializeComponent();
-
 		}
 
 		private void FrmPrinter_Load(object sender, EventArgs e)
@@ -34,7 +36,7 @@ namespace partsSoftClient.Forms
 			printerLoad();
 		}
 
-		private async void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+		private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
 		{
 
 			if (e.ColumnIndex == 4)
@@ -42,13 +44,14 @@ namespace partsSoftClient.Forms
 				string Name = dataGridView1.Rows[e.RowIndex].Cells[1].Value.ToString();
 				string Host = dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString();
 
-				List<Printer> printers = PrinterController.get();
-				foreach (var printer in printers)
+				var activePrinter = getPrinters.FirstOrDefault(p => p.Status);
+
+				if (activePrinter != null)
 				{
-					await PrinterController.Update(printer.Name, printer.HostAddress, false);
+					printerController.Update(activePrinter.Name, activePrinter.HostAddress, false, updateUrl);
 				}
-				
-				await PrinterController.Update(Name, Host, true);
+
+				printerController.Update(Name, Host, true, updateUrl);
 				printerLoad();
 			}
 		}
@@ -63,7 +66,7 @@ namespace partsSoftClient.Forms
 			List<Printer> printers = PrinterHelper.Scanner();
 			foreach (var printer in printers)
 			{
-				ResponseModel response = PrinterController.Post(printer.Name, printer.PortNumber, printer.HostAddress, false);
+				ResponseModel response = printerController.Post(printer.Name, printer.PortNumber, printer.HostAddress, false, postUrl);
 				//MessageBoxComponent.Message("İnfo", response.message, response.isSuccess);
 			}
 		}
@@ -72,11 +75,11 @@ namespace partsSoftClient.Forms
 			dataGridView1.Columns.Clear();
 			dataGridView1.Rows.Clear();
 
-			List<Printer> printers = PrinterController.get();
+			getPrinters = printerController.Get(getUrl, getEndPoint);
 
 			DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
 			DataGridViewButtonColumn sendButton = dataGridViewComponent.CustomButton("Select", "Seç");
-			dataGridViewComponent.CustomPrinterCollumn(printers, sendButton, dataGridView1);
+			dataGridViewComponent.CustomPrinterCollumn(getPrinters, sendButton, dataGridView1);
 		}
 	}
 

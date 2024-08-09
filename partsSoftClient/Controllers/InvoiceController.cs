@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using partsSoftClient.Entity;
 using partsSoftClient.Models;
+using partsSoftClient.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,59 +15,30 @@ namespace partsSoftClient.Controllers
 {
 	public class InvoiceController
 	{
-		public static List<Invoice> get(string url, string endPoint)
+		InvoiceService invoiceService = new InvoiceService();
+
+		public List<Invoice> Get(string url, string endPoint)
 		{
-			List<Invoice> invoices;
-
-			using (var client = new HttpClient(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate }))
-			{
-				client.BaseAddress = new Uri(url);
-				HttpResponseMessage response = client.GetAsync(endPoint).Result;
-				response.EnsureSuccessStatusCode();
-				string result = response.Content.ReadAsStringAsync().Result;
-				invoices = JsonConvert.DeserializeObject<List<Invoice>>(result);
-				
-			}
-
-			return invoices;
+			List<Invoice> invoice = invoiceService.Get(url, endPoint);
+			return invoice;
 		}
 
-		public static async Task<ResponseModel> Post(string invoiceId, bool download)
+		public ResponseModel Update(string id, string postUrl)
 		{
-			var post = new PostInvoice
+			var update = new UpdateInvoice
 			{
-				invoiceId = invoiceId,
-				download = download
+				invoiceId = id,
+				download = true
 			};
-
-			var json = JsonConvert.SerializeObject(post);
-			var data = new StringContent(json, Encoding.UTF8, "application/json");
-			var url = "http://127.0.0.1:3000/api/invoices/post/download";
-
-			using (var client = new HttpClient())
-			{
-				var response = await client.PostAsync(url, data);
-				var result = await response.Content.ReadAsStringAsync();
-
-				var responseModel = JsonConvert.DeserializeObject<ResponseModel>(result);
-
-				return responseModel;
-
-				//MessageBox.Show($"Message: {responseModel.message}\nSuccess: {responseModel.isSuccess}", "Response", MessageBoxButtons.OK, MessageBoxIcon.Information);
-			}
+			ResponseModel responseModel = invoiceService.Update(update, postUrl);
+			return responseModel;
 		}
 
-		public static void  DownloadFile(string url, string endPoint, string filePath)
+		public void DownloadFile(string url, string endPoint, string filePath)
 		{
-			using (var client = new HttpClient(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate }))
-			{
-				client.BaseAddress = new Uri(url);
-				HttpResponseMessage response = client.GetAsync(endPoint).Result;
-				response.EnsureSuccessStatusCode();
-				byte[] fileBytes = response.Content.ReadAsByteArrayAsync().Result;
-				File.WriteAllBytes(filePath, fileBytes);
-			}
-
+			invoiceService.DownloadFile(url, endPoint, filePath);
 		}
+
+
 	}
 }

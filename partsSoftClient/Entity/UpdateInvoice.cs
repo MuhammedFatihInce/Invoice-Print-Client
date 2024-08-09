@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace partsSoftClient.Entity
 {
-	public class PostInvoice
+	public class UpdateInvoice
 	{
 		public string invoiceId { get; set; }
 		public bool download { get; set; }

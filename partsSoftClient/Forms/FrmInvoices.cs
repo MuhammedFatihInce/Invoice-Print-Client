@@ -21,6 +21,7 @@ using System.Timers;
 using System.Drawing.Printing;
 using PdfiumViewer;
 using partsSoftClient.Models;
+using partsSoftClient.Services;
 
 namespace partsSoftClient.Forms
 {
@@ -28,88 +29,38 @@ namespace partsSoftClient.Forms
 	{
 		private System.Timers.Timer timer;
 		private string url;
-		private string endPoint;
 		private string endPointWithUserId;
+
+		PrinterController printerController = new PrinterController();
+		InvoiceController invoiceController = new InvoiceController();
+
+		List<Invoice> invoices;
+		string getUrlPrinter = "http://127.0.0.1:3000";
+		string getEndPointPrinter = "/api/printer/get";
+
+		string updateUrlInvoice = "http://127.0.0.1:3000/api/invoices/post/download";
 
 		public FrmInvoices()
 		{
 			InitializeComponent();
 		}
-
 		private void FrmInvoices_Load(object sender, EventArgs e)
 		{
 			string fileName = ".config";
-			var config = ReadFileHelper.ReadConfigFile(fileName);
+			var (_url, _endPointWithUserId) = GetConfigValues(fileName);
 
-			url = config["url"];
-			endPoint = config["endPoint"];
-			endPointWithUserId = config["endPoint"] + config["userId"];
-
+			url = _url;
+			endPointWithUserId = _endPointWithUserId;
 
 			LoadInvoices();
 
-			timer = new System.Timers.Timer(30000); // 5 dakika (300000 milisaniye)
-			timer.Elapsed += OnTimedEvent;
-			timer.AutoReset = true;
-			timer.Enabled = true;
+			CreateAndStartTimer(2000, OnTimedEvent);
 
 		}
 
 		private void OnTimedEvent(Object source, ElapsedEventArgs e)
 		{
-			// Timer arka planda çalıştığı için UI iş parçacığında güncelleme yapmalıyız.
 			this.Invoke(new Action(() => LoadInvoices()));
-		}
-
-		private async void LoadInvoices()
-		{
-			try
-			{
-				// DataGridView'ı temizle
-				dataGridView1.Columns.Clear();
-				dataGridView1.Rows.Clear();
-
-				// Faturaları indir ve filtrele
-				List<Invoice> invoices = InvoiceController.get(url, endPointWithUserId);
-				List<Invoice> downloadInvoices = invoices.Where(invoice => !invoice.download).ToList();
-
-				// DataGridView'e özelleştirilmiş buton ve sütunları ekle
-				DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
-				dataGridViewComponent.CustomInvoiceCollumn(downloadInvoices, dataGridView1, false);
-
-				// Aktif yazıcıyı bul
-				List<Printer> printers = PrinterController.get();
-				string printerName = printers.FirstOrDefault(printer => printer.Status)?.Name;
-
-				if (string.IsNullOrEmpty(printerName))
-				{
-					MessageBox.Show("Aktif yazıcı bulunamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-					return;
-				}
-
-				// Her bir indirilecek fatura için yazdırma işlemini gerçekleştir ve durumu güncelle
-				foreach (var invoice in downloadInvoices)
-				{
-					string id = invoice.invoiceId.ToString();
-					string filePath= pdf_Dowload(invoice.invoicePath);
-					bool isSuccess = PrinterHelper.PrintInvoice(filePath, printerName);
-
-					if (isSuccess)
-					{
-						await InvoiceController.Post(id, true);
-					}
-					else
-					{
-						MessageBox.Show($"Fatura {id} yazdırılamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-					}
-				}
-
-				//MessageBox.Show("Tüm faturalar yazdırıldı.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
-			}
-			catch (Exception ex)
-			{
-				MessageBox.Show($"Bir hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-			}
 		}
 
 		private void dataGridView1_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
@@ -121,10 +72,8 @@ namespace partsSoftClient.Forms
 		{
 			if (e.ColumnIndex == 4)
 			{
-				string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-				string uploadPath = Path.Combine(desktopPath, "uploads");
 				string fileName = dataGridView1.Rows[e.RowIndex].Cells[4].Value.ToString();
-				string filePath = Path.Combine(uploadPath, fileName);
+				string filePath = FileHelper.getFolderPath(fileName);
 				ProcessStartInfo sInfo = new ProcessStartInfo(filePath);
 				Process.Start(sInfo);
 			}
@@ -138,24 +87,47 @@ namespace partsSoftClient.Forms
 				timer.Dispose();
 			}
 		}
+		private void LoadInvoices()
+		{
+			try
+			{
 
+				dataGridView1.Columns.Clear();
+				dataGridView1.Rows.Clear();
+
+				// Faturaları indir ve filtrele
+				invoices = invoiceController.Get(url, endPointWithUserId);
+				List<Invoice> downloadInvoices = invoices.Where(invoice => !invoice.download).ToList();
+
+				// DataGridView'e özelleştirilmiş buton ve sütunları ekle
+				DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
+				dataGridViewComponent.CustomInvoiceCollumn(downloadInvoices, dataGridView1, false);
+
+				if (downloadInvoices != null)
+				{
+					// Aktif yazıcıyı bul
+					string printerName = FindActivePrinterName(getUrlPrinter, getEndPointPrinter);
+
+					// Her bir indirilecek fatura için yazdırma işlemini gerçekleştir ve durumu güncelle
+					PrintAndUpdateInvoices(downloadInvoices, printerName, updateUrlInvoice);
+				}
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show($"Bir hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+		}
 		private string pdf_Dowload(string fileName)
 		{
 			string url = "http://localhost:3000"; // İndirilecek dosyanın URL'si
-			string endPoint = "/uploads"+"/"+ fileName; // İndirilecek dosyanın URL'si
-														
-			string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-			string uploadPath = Path.Combine(desktopPath, "uploads");
-			if (!Directory.Exists(uploadPath))
-			{
-				Directory.CreateDirectory(uploadPath);
-			}
-			string filePath = Path.Combine(uploadPath, fileName);
+			string endPoint = "/uploads" + "/" + fileName; // İndirilecek dosyanın URL'si
+
+			string filePath = FileHelper.getFolderPath(fileName);
 
 			try
 			{
-				InvoiceController.DownloadFile(url, endPoint, filePath);
-				MessageBox.Show("Dosya başarıyla indirildi ve kaydedildi!", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+				invoiceController.DownloadFile(url, endPoint, filePath);
+				//MessageBox.Show("Dosya başarıyla indirildi ve kaydedildi!", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
 			catch (Exception ex)
 			{
@@ -163,9 +135,59 @@ namespace partsSoftClient.Forms
 			}
 			return filePath;
 		}
+		public string FindActivePrinterName(string baseUrl, string endpoint)
+		{
+			List<Printer> printers = printerController.Get(baseUrl, endpoint);
 
-		
+			string printerName = printers.FirstOrDefault(printer => printer.Status)?.Name;
 
+			if (string.IsNullOrEmpty(printerName))
+			{
+				MessageBox.Show("Aktif yazıcı bulunamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+
+			return printerName;
+		}
+		public void PrintAndUpdateInvoices(List<Invoice> downloadInvoices, string printerName, string updateUrl)
+		{
+			foreach (var invoice in downloadInvoices)
+			{
+				string id = invoice.invoiceId.ToString();
+				string filePath = pdf_Dowload(invoice.invoicePath); // PDF dosyasını indir
+				bool isSuccess = PrinterHelper.PrintInvoice(filePath, printerName); // Yazdırma işlemini gerçekleştir
+
+				if (isSuccess)
+				{
+					// Yazdırma başarılıysa faturanın durumunu güncelle
+					invoiceController.Update(id, updateUrl);
+				}
+				else
+				{
+					MessageBox.Show($"Fatura {id} yazdırılamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				}
+			}
+
+			//// Tüm faturalar yazdırıldı mesajı
+			//MessageBox.Show("Tüm faturalar yazdırıldı.", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+		}
+		public (string url, string endPointWithUserId) GetConfigValues(string fileName)
+		{
+			var config = FileHelper.ReadConfigFile(fileName);
+
+			string url = config["url"];
+			string endPointWithUserId = config["endPoint"] + config["userId"];
+
+			return (url, endPointWithUserId);
+		}
+		public System.Timers.Timer CreateAndStartTimer(double intervalInMilliseconds, ElapsedEventHandler onElapsedEvent)
+		{
+			var timer = new System.Timers.Timer(intervalInMilliseconds);
+			timer.Elapsed += onElapsedEvent;
+			timer.AutoReset = true;
+			timer.Enabled = true;
+			return timer;
+		}
 	}
 }
 

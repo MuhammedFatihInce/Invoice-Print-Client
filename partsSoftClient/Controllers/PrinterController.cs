@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using partsSoftClient.Entity;
 using partsSoftClient.Models;
+using partsSoftClient.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +16,15 @@ namespace partsSoftClient.Controllers
 {
 	public class PrinterController
 	{
-		public static ResponseModel Post(string name, string portNumber, string hostAddress, bool status)
+		PrinterService printerService = new PrinterService();
+
+		public List<Printer> Get(string url, string endPoint)
+		{
+			List<Printer> printer = printerService.Get(url, endPoint);
+			return printer;
+		}
+
+		public ResponseModel Post(string name, string portNumber, string hostAddress, bool status, string postUrl)
 		{
 			var printer = new Printer
 			{
@@ -24,66 +33,20 @@ namespace partsSoftClient.Controllers
 				HostAddress = hostAddress,
 				Status = status
 			};
-
-			var json = JsonConvert.SerializeObject(printer);
-			var data = new StringContent(json, Encoding.UTF8, "application/json");
-			var url = "http://127.0.0.1:3000/api/printer/post";
-
-			using (var client = new HttpClient())
-			{
-				var response = client.PostAsync(url, data).Result;
-				var result = response.Content.ReadAsStringAsync().Result;
-
-				var responseModel = JsonConvert.DeserializeObject<ResponseModel>(result);
-
-				return responseModel;
-
-				//MessageBox.Show($"Message: {responseModel.message}\nSuccess: {responseModel.isSuccess}", "Response", MessageBoxButtons.OK, MessageBoxIcon.Information);
-			}
+			ResponseModel responseModel = printerService.Post(printer, postUrl);
+			return responseModel;
 		}
 
-
-		public static List<Printer> get()
+		public ResponseModel Update(string name, string hostAddress, bool status, string postUrl)
 		{
-			List<Printer> printer;
-
-			using (var client = new HttpClient(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate }))
+			var printer = new UpdatePrinter
 			{
-				client.BaseAddress = new Uri("http://127.0.0.1:3000");
-				HttpResponseMessage response = client.GetAsync("/api/printer/get").Result;
-				response.EnsureSuccessStatusCode();
-				string result = response.Content.ReadAsStringAsync().Result;
-				printer = JsonConvert.DeserializeObject<List<Printer>>(result);
-
-			}
-
-			return printer;
-		}
-
-		public static async Task<ResponseModel> Update(string Name, string hostAddress, bool status)
-		{
-			var post = new PostPrinter
-			{
-				Name = Name,
-				HostAddress = hostAddress,
+				Name = name,
+				HostAddress =hostAddress,
 				Status = status
 			};
-
-			var json = JsonConvert.SerializeObject(post);
-			var data = new StringContent(json, Encoding.UTF8, "application/json");
-			var url = "http://127.0.0.1:3000/api/printer/updateStatus";
-
-			using (var client = new HttpClient())
-			{
-				var response = await client.PostAsync(url, data);
-				var result = await response.Content.ReadAsStringAsync();
-
-				var responseModel = JsonConvert.DeserializeObject<ResponseModel>(result);
-
-				return responseModel;
-
-				//MessageBox.Show($"Message: {responseModel.message}\nSuccess: {responseModel.isSuccess}", "Response", MessageBoxButtons.OK, MessageBoxIcon.Information);
-			}
+			ResponseModel responseModel = printerService.Update(printer, postUrl);
+			return responseModel;
 		}
 	}
 }

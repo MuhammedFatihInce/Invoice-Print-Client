@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace partsSoftClient.Entity
 {
-	public class PostPrinter
+	public class UpdatePrinter
 	{
 		public string Name { get; set; }
 		public string HostAddress { get; set; }

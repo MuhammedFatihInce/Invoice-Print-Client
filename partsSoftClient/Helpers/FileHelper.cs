@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace partsSoftClient.Helpers
 {
-	public class ReadFileHelper
+	public class FileHelper
 	{
         public static Dictionary<string, string> ReadConfigFile(string filePath)
         {
@@ -31,6 +31,18 @@ namespace partsSoftClient.Helpers
             }
 
             return configDictionary;
+        }
+        public static string getFolderPath(string fileName)
+        {
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string uploadPath = Path.Combine(desktopPath, "uploads");
+            if (!Directory.Exists(uploadPath))
+            {
+                Directory.CreateDirectory(uploadPath);
+            }
+            string filePath = Path.Combine(uploadPath, fileName);
+
+            return filePath;
         }
     }
 }

@@ -20,8 +20,11 @@ namespace partsSoftClient.Forms
 	public partial class FrmHistory : Form
 	{
 		private string url;
-		private string endPoint;
 		private string endPointWithUserId;
+
+		List<Invoice> invoices;
+
+		InvoiceController invoiceController = new InvoiceController();
 
 		public FrmHistory()
 		{
@@ -31,55 +34,33 @@ namespace partsSoftClient.Forms
 		private void FrmHistory_Load(object sender, EventArgs e)
 		{
 			string fileName = ".config";
-			var config = ReadFileHelper.ReadConfigFile(fileName);
+			var config = FileHelper.ReadConfigFile(fileName);
 
 			url = config["url"];
-			endPoint = config["endPoint"];
 			endPointWithUserId = config["endPoint"] + config["userId"];
 
-
-			LoadInvoices();
+			DateTime selectedDate = DateTime.Now.Date;
+			LoadInvoices(selectedDate);
 		}
 
-		private void LoadInvoices()
+		private void LoadInvoices(DateTime selectedDate)
 		{
 			try
 			{
-				// DataGridView'ı temizle
 				dataGridView1.Columns.Clear();
 				dataGridView1.Rows.Clear();
 
-				// 1. Fatura listesini çekin
-				List<Invoice> invoices = InvoiceController.get(url, endPointWithUserId);
+				invoices = invoiceController.Get(url, endPointWithUserId);
 
-				// 2. DateTimePicker'dan seçilen tarihi alın
-				//DateTime selectedDate = dateTimePicker1.Value.Date;
-				DateTime today = DateTime.Now.Date;
-				string date = today.ToString("dd.MM.yyyy");
+				string date = selectedDate.ToString("dd.MM.yyyy");
 				
-
-				// 3. Seçilen tarihle eşleşen ve indirilebilir olan faturaları filtreleyin
 				List<Invoice> downloadInvoices = invoices
 					.Where(invoice => invoice.download && invoice.updatedAt.Date.ToString("dd.MM.yyyy") == date)
 					.ToList();
 
-				// DataGridView'e özelleştirilmiş buton ve sütunları ekle
+				
 				DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
 				dataGridViewComponent.CustomInvoiceCollumn(downloadInvoices, dataGridView1, true);
-
-
-
-				//// DataGridView'ı temizle
-				//dataGridView1.Columns.Clear();
-				//dataGridView1.Rows.Clear();
-
-				//// Faturaları indir ve filtrele
-				//List<Invoice> invoices = InvoiceController.get(url, endPointWithUserId);
-				//List<Invoice> downloadInvoices = invoices.Where(invoice => invoice.download).ToList();
-
-				//// DataGridView'e özelleştirilmiş buton ve sütunları ekle
-				//DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
-				//dataGridViewComponent.CustomInvoiceCollumn(downloadInvoices, dataGridView1, true);
 
 			}
 			catch (Exception ex)
@@ -88,50 +69,25 @@ namespace partsSoftClient.Forms
 			}
 		}
 
-
-		private void dataGridView1_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
-		{
-			e.Cancel = true;
-		}
-
-
 		private void simpleButton1_Click(object sender, EventArgs e)
 		{
-			// DataGridView'ı temizle
-			dataGridView1.Columns.Clear();
-			dataGridView1.Rows.Clear();
-
-			// 1. Fatura listesini çekin
-			List<Invoice> invoices = InvoiceController.get(url, endPointWithUserId);
-
-			// 2. DateTimePicker'dan seçilen tarihi alın
 			DateTime selectedDate = dateTimePicker1.Value.Date;
-
-			// 3. Seçilen tarihle eşleşen ve indirilebilir olan faturaları filtreleyin
-			List<Invoice> downloadInvoices = invoices
-				.Where(invoice => invoice.download && invoice.updatedAt.Date == selectedDate)
-				.ToList();
-
-			// DataGridView'e özelleştirilmiş buton ve sütunları ekle
-			DataGridViewComponent dataGridViewComponent = new DataGridViewComponent();
-			dataGridViewComponent.CustomInvoiceCollumn(downloadInvoices, dataGridView1, true);
-
-
+			LoadInvoices(selectedDate);
 		}
 
 		private void simpleButton2_Click(object sender, EventArgs e)
 		{
-			LoadInvoices();
+			DateTime selectedDate = DateTime.Now.Date;
+			LoadInvoices(selectedDate);
 		}
 
 		private void dataGridView1_CellClick_1(object sender, DataGridViewCellEventArgs e)
 		{
 			if (e.ColumnIndex == 7)
 			{
-				string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-				string uploadPath = Path.Combine(desktopPath, "uploads");
 				string fileName = dataGridView1.Rows[e.RowIndex].Cells[4].Value.ToString();
-				string filePath = Path.Combine(uploadPath, fileName);
+				string filePath = FileHelper.getFolderPath(fileName);
+
 				PrinterHelper.PrintPdf(filePath);
 				MessageBox.Show("Yazdırma Başarılı.");
 
@@ -142,13 +98,17 @@ namespace partsSoftClient.Forms
 		{
 			if (e.ColumnIndex == 4)
 			{
-				string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-				string uploadPath = Path.Combine(desktopPath, "uploads");
 				string fileName = dataGridView1.Rows[e.RowIndex].Cells[4].Value.ToString();
-				string filePath = Path.Combine(uploadPath, fileName);
+				string filePath = FileHelper.getFolderPath(fileName);
+
 				ProcessStartInfo sInfo = new ProcessStartInfo(filePath);
 				Process.Start(sInfo);
 			}
+		}
+
+		private void dataGridView1_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+		{
+			e.Cancel = true;
 		}
 	}
 }
